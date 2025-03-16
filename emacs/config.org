@@ -1,0 +1,292 @@
+#+TITLE: My Emacs Configuration
+#+AUTHOR: Zoltan Molnar
+#+PROPERTY: header-args:emacs-lisp :tangle config.el
+
+* Generic
+
+** Backup files
+
+#+BEGIN_SRC emacs-lisp
+  (setq make-backup-files nil)
+  (setq auto-save-default nil)
+  (setq version-control nil)  
+#+END_SRC
+
+** Package signature handling
+
+#+BEGIN_SRC emacs-lisp
+  (setq package-check-signature nil)
+;;  (setq package-check-signature 'allow-unsigned)
+#+END_SRC
+
+** Line numbering
+
+#+BEGIN_SRC emacs-lisp
+  (global-linum-mode 1)
+#+END_SRC
+
+** Follow symbolic links to git controlled files automatically
+
+#+BEGIN_SRC emacs-lisp
+  (setq vc-follow-symlinks t)
+#+END_SRC
+
+* Package Management
+
+** Servers
+
+#+BEGIN_SRC emacs-lisp
+  (require 'package)
+  (add-to-list 'package-archives
+	       '("melpa" . "https://melpa.org/packages/") t)
+;;  (package-initialize)
+;;  (package-refresh-contents)
+#+END_SRC
+
+** Package macros
+
+#+BEGIN_SRC emacs-lisp
+  (unless (package-installed-p 'use-package)
+  (package-refresh-contents)
+  (package-install 'use-package))
+  (eval-and-compile
+  (setq use-package-always-ensure t
+	use-package-expand-minimally t))
+#+END_SRC
+
+* Yasnippet
+
+#+BEGIN_SRC emacs-lisp
+  (use-package yasnippet
+    :ensure t
+    :config
+    (yas-global-mode 1))  ;; Enable YASnippet globally
+#+END_SRC
+
+* Ivy Configuration
+
+** Core
+
+#+BEGIN_SRC emacs-lisp
+
+  (use-package ivy
+    :ensure t
+    :diminish  ;; Hide from the mode-line
+    :bind (("C-c C-r" . ivy-resume)  ;; Resume last Ivy session
+	   ("C-x b" . ivy-switch-buffer))  ;; Better buffer switching
+    :init
+    (ivy-mode 1)  ;; Enable Ivy globally
+    (setq ivy-use-virtual-buffers t)  ;; Show recent files in switch buffer
+    (setq ivy-count-format "(%d/%d) ")  ;; Show match count
+    (setq enable-recursive-minibuffers t)
+    (add-to-list 'ivy-re-builders-alist
+		 '(ivy-switch-buffer . ivy--regex-fuzzy)))
+  
+#+END_SRC
+
+** Counsel
+
+Counsel is an extension of Ivy, providing enhanced versions of Emacs commands
+with better completion, search, and navigation.
+It replaces and improves many built-in commands with Ivy-powered alternatives.
+
+#+BEGIN_SRC emacs-lisp
+  
+  (use-package counsel
+    :ensure t
+    :after ivy
+    :bind (("M-x" . counsel-M-x)  ;; Enhanced M-x
+	   ("C-x C-f" . counsel-find-file)  ;; Better file finder
+	   ("C-c g" . counsel-git)  ;; Find files in Git repo
+	   ("C-c j" . counsel-git-grep)  ;; Search in Git repo
+	   ("C-c k" . counsel-rg))  ;; Ripgrep search
+    :config
+    (counsel-mode 1)
+    (dolist (pair '((counsel-find-file . ivy--regex-fuzzy)
+		    (counsel-M-x . ivy--regex-fuzzy)))
+      (add-to-list 'ivy-re-builders-alist pair)))
+
+#+END_SRC
+
+** Swiper
+
+Swiper is an alternative to isearch that uses Ivy to show an overview of all matches.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package swiper
+    :ensure t
+    :after ivy
+    :bind (("C-s" . swiper)  ;; Replace default search with Swiper
+	   ("C-r" . swiper))  ;; Use Swiper for reverse search
+    :config
+    (setq swiper-action-recenter t)  ;; Keep cursor centered
+    (setq swiper-include-line-number-in-search t)
+    (setq swiper--re-builder 'swiper--regex-plus))
+
+#+END_SRC
+
+** Prescient
+
+Enhances Ivy's sorting and filtering by remembering frequently used selections.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package ivy-prescient
+    :ensure t
+    :after ivy
+    :config
+    (ivy-prescient-mode 1))
+#+END_SRC
+
+** Rich
+
+Enhances Ivy minibuffer display with more detailed candidate information.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package ivy-rich
+    :ensure t
+    :after ivy
+    :config
+    (ivy-rich-mode 1)
+    (setq ivy-rich-path-style 'abbrev))
+#+END_SRC
+
+* Yaml mode
+
+#+BEGIN_SRC emacs-lisp
+  (use-package yaml-mode
+    :ensure t)
+#+END_SRC
+
+* Git
+
+#+BEGIN_SRC emacs-lisp
+;;  (use-package magit
+;;    :ensure t)
+;;  (setq package-install-upgrade-built-in t)
+#+END_SRC
+
+* TODO Rust Mode Configuration
+
+#+BEGIN_SRC emacs-lisp
+;;  (use-package rust-mode
+;;    :ensure t
+;;    :hook (rust-mode . lsp))  ;; Start LSP automatically when opening Rust files  
+#+END_SRC
+
+* Flycheck Configuration
+
+Enable Flycheck for syntax checking.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package flycheck
+    :config
+    (add-hook 'after-init-hook #'global-flycheck-mode))
+#+END_SRC
+
+* Theme and UI
+
+Load the Monokai-Pro theme.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package monokai-pro-theme
+    :config
+    (load-theme 'monokai-pro t))
+#+END_SRC
+
+* Org mode
+
+** Pretty formatting
+
+#+BEGIN_SRC emacs-lisp
+  (setq org-src-fontify-natively t
+	org-src-tab-acts-natively t)
+#+END_SRC
+
+* LSP Configuration for C++ and C
+
+Enable LSP for C++ and C.
+
+#+BEGIN_SRC emacs-lisp
+
+    (defun my-lsp-switch-compile-commands-json ()
+      "Prompt for a root directory to scan, then use the found `compile_commands.json` file instead of recompiling.
+    If a valid compile_commands.json is found, restart the LSP workspace."
+      (interactive)
+      (let* ((scan-root (read-directory-name "Select root directory to scan: "))
+	     (files (directory-files-recursively scan-root "compile_commands.json"))
+	     (selection (if files
+			    (completing-read "Select compile_commands.json: " files nil t)
+			  nil)))
+	(if selection
+	    (progn
+	      (setq lsp-clients-clangd-args (list (concat "--compile-commands-dir=" (file-name-directory selection))))
+	      (message "compile_commands.json set to: %s" selection)
+	      (lsp-restart-workspace))
+	  (message "No compile_commands.json found. LSP may not function correctly."))))
+
+  (use-package lsp-mode
+    :init
+    :config
+    (setq lsp-keymap-prefix "C-c l")
+    :hook ((c-mode . lsp)
+	   (c++-mode . lsp))
+    :custom
+    (lsp-clients-clangd-executable "clangd"))
+
+#+END_SRC
+
+* LSP-UI Configuration
+
+Enable and configure lsp-ui for a better LSP UI experience.
+
+#+BEGIN_SRC emacs-lisp
+
+#+END_SRC
+
+* Projectile
+
+#+BEGIN_SRC emacs-lisp
+  (use-package projectile
+    :ensure t
+    :after ivy
+    :bind    (("C-c p f" . projectile-find-file)
+	      ("C-c p p" . projectile-switch-project)
+	      ("C-c p b" . projectile-switch-to-buffer))
+    :config
+    (projectile-mode +1)
+    (setq projectile-completion-system 'ivy)
+    (setq projectile-project-search-path '("/home/zoltan/Gitlab"))
+    (add-to-list 'ivy-re-builders-alist
+		 '(projectile-find-file . ivy--regex-fuzzy)))
+
+#+END_SRC
+
+* Treemacs
+
+#+BEGIN_SRC emacs-lisp
+
+  (use-package treemacs
+    :ensure t
+    :after projectile
+    :config
+    ;; Automatically follow the active project in Treemacs
+    (setq treemacs-project-follow-mode t)  ;; Automatically follow the current project
+    (setq treemacs-follow-mode t)          ;; Follow the file in the window
+    :bind
+    (("C-x t t" . treemacs)            ;; Open Treemacs with C-x t t
+     ("C-x t f" . treemacs-find-file)   ;; Find a file in Treemacs
+     ("C-x t p" . treemacs-projects)    ;; List all projects in Treemacs
+     ("C-x t s" . treemacs-toggle)))    ;; Toggle Treemacs window
+
+  
+#+END_SRC
+
+* Company Mode Configuration
+
+Enable Company for autocompletion.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package company
+    :hook (after-init-hook . global-company-mode))
+#+END_SRC
+
