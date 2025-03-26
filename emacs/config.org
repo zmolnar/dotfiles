@@ -1,6 +1,6 @@
 #+TITLE: My Emacs Configuration
 #+AUTHOR: Zoltan Molnar
-#+PROPERTY: header-args:emacs-lisp :tangle config.el
+#+PROPERTY: header-args:emacs-lisp
 
 * Generic
 
@@ -31,6 +31,21 @@
   (setq vc-follow-symlinks t)
 #+END_SRC
 
+** TAB width
+
+#+BEGIN_SRC emacs-lisp
+  (setq-default tab-width 4)  ;; Set default tab width to 4
+  (setq-default indent-tabs-mode nil)  ;; Use spaces instead of tabs
+#+END_SRC
+
+
+* Font size
+
+#+BEGIN_SRC emacs-lisp
+  (set-face-attribute 'default nil :height 120)  ;; 120 means 12pt font size
+#+END_SRC
+
+
 * Package Management
 
 ** Servers
@@ -50,9 +65,24 @@
   (package-refresh-contents)
   (package-install 'use-package))
   (eval-and-compile
-  (setq use-package-always-ensure t
+    (setq use-package-always-ensure t
 	use-package-expand-minimally t))
 #+END_SRC
+
+* Drag-stuff
+
+This package is used for moving regions up and down or right and left
+
+#+BEGIN_SRC emacs-lisp
+  (use-package drag-stuff
+    :ensure t
+    :config
+    (drag-stuff-mode t)
+    (drag-stuff-global-mode 1)
+    :bind (("M-<down>" . drag-stuff-down)
+           ("M-<up>" . drag-stuff-up)))
+#+END_SRC
+
 
 * Yasnippet
 
@@ -160,9 +190,9 @@ Enhances Ivy minibuffer display with more detailed candidate information.
 * Git
 
 #+BEGIN_SRC emacs-lisp
-;;  (use-package magit
-;;    :ensure t)
-;;  (setq package-install-upgrade-built-in t)
+  (use-package magit
+    :ensure t)
+  (setq package-install-upgrade-built-in t)
 #+END_SRC
 
 * TODO Rust Mode Configuration
@@ -195,12 +225,21 @@ Load the Monokai-Pro theme.
 
 * Org mode
 
-** Pretty formatting
+** Templates
 
 #+BEGIN_SRC emacs-lisp
-  (setq org-src-fontify-natively t
-	org-src-tab-acts-natively t)
+  (use-package org
+    :ensure t
+    :init
+    ;; Pretty formatting
+    (setq org-src-fontify-natively t
+          org-src-tab-acts-natively t)
+    :bind (("C-c a" . org-agenda)
+           ("C-c c" . org-capture))
+    :hook ((org-mode . auto-fill-mode)
+           (org-mode . (lambda () (setq fill-column 80)))))
 #+END_SRC
+
 
 * LSP Configuration for C++ and C
 
@@ -208,40 +247,71 @@ Enable LSP for C++ and C.
 
 #+BEGIN_SRC emacs-lisp
 
-    (defun my-lsp-switch-compile-commands-json ()
-      "Prompt for a root directory to scan, then use the found `compile_commands.json` file instead of recompiling.
-    If a valid compile_commands.json is found, restart the LSP workspace."
-      (interactive)
-      (let* ((scan-root (read-directory-name "Select root directory to scan: "))
-	     (files (directory-files-recursively scan-root "compile_commands.json"))
-	     (selection (if files
-			    (completing-read "Select compile_commands.json: " files nil t)
-			  nil)))
-	(if selection
-	    (progn
-	      (setq lsp-clients-clangd-args (list (concat "--compile-commands-dir=" (file-name-directory selection))))
-	      (message "compile_commands.json set to: %s" selection)
-	      (lsp-restart-workspace))
-	  (message "No compile_commands.json found. LSP may not function correctly."))))
+  (defun my-lsp-switch-compile-commands-json ()
+    "Prompt for a root directory to scan, then use the found `compile_commands.json`
+     file instead of recompiling. If a valid compile_commands.json is found, restart
+     the LSP workspace."
+    (interactive)
+    (let* ((scan-root (read-directory-name "Select root directory to scan: "))
+           (files (directory-files-recursively scan-root "compile_commands.json"))
+           (selection (if files
+                          (completing-read "Select compile_commands.json: " files nil t)
+                        nil)))
+      (if selection
+          (progn
+            (setq-default lsp-clients-clangd-args
+                          (list (concat "--compile-commands-dir=" (file-name-directory selection))))
+            (message "compile_commands.json set to: %s" selection)
+            (lsp-restart-workspace))
+        (message "No compile_commands.json found. LSP may not function correctly."))))
 
   (use-package lsp-mode
     :init
-    :config
-    (setq lsp-keymap-prefix "C-c l")
-    :hook ((c-mode . lsp)
-	   (c++-mode . lsp))
-    :custom
-    (lsp-clients-clangd-executable "clangd"))
+    (setq lsp-clients-clangd-executable "clangd")
+    (setq lsp-keymap-prefix "C-c l")  ;; Set the keymap prefix for LSP
+    (setq lsp-enable-on-type-formatting nil
+          lsp-enable-indentation nil
+          lsp-enable-formatting nil)
+    :hook ((c-mode . lsp)  ;; Enable LSP in C mode
+           (c++-mode . lsp))  ;; Enable LSP in C++ mode
+    )  
 
 #+END_SRC
+
+* Custom clang-format
+
+#+BEGIN_SRC emacs-lisp
+  (use-package clang-format
+    :ensure t
+    :config
+    (setq clang-format-executable "/home/zoltan/.local/bin/clang-format")
+    :bind ("C-c i" . clang-format-buffer))
+
+
+#+END_SRC
+
+
 
 * LSP-UI Configuration
 
 Enable and configure lsp-ui for a better LSP UI experience.
 
 #+BEGIN_SRC emacs-lisp
-
+  (use-package lsp-ui
+  :ensure t
+  :commands lsp-ui-mode
+  :hook (lsp-mode . lsp-ui-mode)
+  :custom
+  (lsp-ui-doc-enable t)           ;; Enable documentation popups
+  (lsp-ui-doc-delay 1.0)          ;; Delay the pop-up window
+  (lsp-ui-doc-position 'at-point) ;; Show docs at cursor position
+  (lsp-ui-sideline-enable nil)    ;; Show info in the sideline
+  (lsp-ui-peek-enable t)          ;; Enable peek definition
+  (lsp-ui-peek-always-show t)     ;; Always show peek result
+  (lsp-ui-peek-show-directory t)) ;; Show the directory in peek
 #+END_SRC
+
+
 
 * Projectile
 
@@ -250,12 +320,11 @@ Enable and configure lsp-ui for a better LSP UI experience.
     :ensure t
     :after ivy
     :bind    (("C-c p f" . projectile-find-file)
-	      ("C-c p p" . projectile-switch-project)
-	      ("C-c p b" . projectile-switch-to-buffer))
+	      ("C-c p p" . projectile-switch-project))
     :config
     (projectile-mode +1)
     (setq projectile-completion-system 'ivy)
-    (setq projectile-project-search-path '("/home/zoltan/Gitlab"))
+    (setq projectile-project-search-path '("/home/zoltan"))
     (add-to-list 'ivy-re-builders-alist
 		 '(projectile-find-file . ivy--regex-fuzzy)))
 
@@ -278,7 +347,10 @@ Enable and configure lsp-ui for a better LSP UI experience.
      ("C-x t p" . treemacs-projects)    ;; List all projects in Treemacs
      ("C-x t s" . treemacs-toggle)))    ;; Toggle Treemacs window
 
-  
+  (use-package treemacs-projectile
+    :after treemacs
+    :ensure t)
+
 #+END_SRC
 
 * Company Mode Configuration
